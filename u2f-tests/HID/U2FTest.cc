@@ -64,6 +64,7 @@ struct U2Fob* device;
 
 U2F_REGISTER_REQ regReq;
 U2F_REGISTER_RESP regRsp;
+U2F_AUTHENTICATE_REQ authReq;
 
 void test_Version() {
   string rsp;
@@ -118,12 +119,6 @@ void test_WrongLength_U2F_REGISTER() {
 }
 
 void test_Enroll(int expectedSW12 = 0x9000) {
-  // pick random origin and challenge.
-  for (size_t i = 0; i < sizeof(regReq.nonce); ++i)
-      regReq.nonce[i] = rand();
-  for (size_t i = 0; i < sizeof(regReq.appId); ++i)
-      regReq.appId[i] = rand();
-
   uint64_t t = 0; U2Fob_deltaTime(&t);
 
   string rsp;
@@ -214,11 +209,6 @@ void test_Enroll(int expectedSW12 = 0x9000) {
 
 // returns ctr
 uint32_t test_Sign(int expectedSW12 = 0x9000, bool checkOnly = false) {
-  U2F_AUTHENTICATE_REQ authReq;
-
-  // pick random challenge and use registered appId.
-  for (size_t i = 0; i < sizeof(authReq.nonce); ++i)
-      authReq.nonce[i] = rand();
   memcpy(authReq.appId, regReq.appId, sizeof(authReq.appId));
   authReq.keyHandleLen = regRsp.keyHandleLen;
   memcpy(authReq.keyHandle, regRsp.keyHandleCertSig, authReq.keyHandleLen);
@@ -333,12 +323,22 @@ int main(int argc, char* argv[]) {
   PASS(test_WrongLength_U2F_REGISTER());
   PASS(test_BadCLA());
 
+  // pick random origin and challenge.
+  for (size_t i = 0; i < sizeof(regReq.nonce); ++i)
+      regReq.nonce[i] = rand();
+  for (size_t i = 0; i < sizeof(regReq.appId); ++i)
+      regReq.appId[i] = rand();
+
   // Fob with button should need touch.
   if (arg_hasButton) PASS(test_Enroll(0x6985));
 
   WaitForUserPresence(device, arg_hasButton);
 
   PASS(test_Enroll(0x9000));
+
+  // pick random challenge and use registered appId.
+  for (size_t i = 0; i < sizeof(authReq.nonce); ++i)
+      authReq.nonce[i] = rand();
 
   // Fob with button should have consumed touch.
   if (arg_hasButton) PASS(test_Sign(0x6985));
